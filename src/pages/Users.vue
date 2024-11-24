@@ -22,12 +22,12 @@
       </ion-header>
       <ion-grid>
         <ion-row v-for="user in users">
-          <ion-col class="left">
+          <ion-col class="left" size="3">
             <ion-label>
               <h2>{{ user.name }}</h2>
             </ion-label>
           </ion-col>
-          <ion-col class="left">
+          <ion-col class="left" size="2">
             <ion-label>
               <p>{{ user.role }}</p>
             </ion-label>
@@ -37,7 +37,7 @@
               <p>{{ user.expenses.length }} Expenses</p>
             </ion-label>
           </ion-col>
-          <ion-col size="3">
+          <ion-col size="2">
             <ion-label>
               <p>{{ user.trips.length }} Trips</p>
             </ion-label>
@@ -98,7 +98,8 @@ import {
   create
 } from "ionicons/icons";
 import { useIFetch } from "@/composables/UseIonosfetch";
-const { get, post, put, del, request } = useIFetch();
+const $ifetch = useIFetch();
+
 import { ref, computed, onMounted } from "vue";
 
 interface User {
@@ -123,7 +124,7 @@ const mdiIconText = (name: string) => {
 
 // Fetch Data on Mount
 onMounted(async () => {
-  users.value = await get("/api/users");
+  users.value = await $ifetch.get("/api/users");
 });
 </script>
 

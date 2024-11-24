@@ -6,6 +6,9 @@
           <ion-buttons slot="start">
             <ion-menu-button size="small"></ion-menu-button>
           </ion-buttons>
+          <ion-title slot="start">
+            <span @click="goToTrips">{{ ltripname }}</span>
+          </ion-title>
           <ion-buttons slot="end">
             <ion-button shape="round" size="small">
               <ion-icon slot="icon-only" :icon="addCircle"></ion-icon>
@@ -20,12 +23,11 @@
               <ion-icon slot="icon-only" :icon="reload"></ion-icon>
             </ion-button>
           </ion-buttons>
-          <ion-title>Expenses</ion-title>
         </ion-toolbar>
       </ion-header>
       <!--ion-item v-for="expense in expenses"-->
       <ion-grid>
-        <ion-row v-for="expense in expenses">
+        <ion-row v-for="expense in filteredexpenses">
           <ion-col size="1.2">
             <h1><i :class="mdiIconText(expense.category.icon)"></i></h1>
           </ion-col>
@@ -45,7 +47,7 @@
           <ion-col class="left">
             <ion-label>
               <h2>{{ expense.description }}</h2>
-              <p>{{ expense.trip.name }}, {{ expense.user.name }}</p>
+              <p>Payed by {{ expense.user.name }}</p>
             </ion-label>
           </ion-col>
           <ion-col size="2"> {{ expense.amount }} € </ion-col>
@@ -99,11 +101,29 @@ import {
   trashBinOutline,
   trashBin,
   createOutline,
-  create
+  create,
 } from "ionicons/icons";
 import { useIFetch } from "@/composables/UseIonosfetch";
-const { get, post, put, del, request } = useIFetch();
+const $ifetch = useIFetch();
+
 import { ref, computed, onMounted } from "vue";
+import { CapacitorCookies } from "@capacitor/core";
+import { useRouter } from "vue-router";
+const router = useRouter();
+
+interface TripUser {
+  user: {
+    name: string;
+  };
+}
+
+interface Trip {
+  id: string;
+  startDate: Date;
+  name: string;
+  users: TripUser[];
+  expenses: [];
+}
 
 interface Expense {
   date: Date;
@@ -120,16 +140,60 @@ interface Expense {
   };
 }
 
-const expenses = ref<Expense[]>();
+const trips = ref<Trip[]>();
+const ltripname = ref("");
+const selectedTrip = ref<Trip>();
+const selectedTripId = ref("");
+const filteredexpenses = ref<Expense[]>();
+// const debug = ref(false);
+//const expenses = ref<Expense[]>();
 const mdiIconText = (name: string) => {
   return "mdi " + name;
 };
 
 // Fetch Data on Mount
 onMounted(async () => {
-  expenses.value = await get("/api/expenses");
+  trips.value = await $ifetch.get("/api/trips");
+  const temp = await CapacitorCookies.getCookies();
+  if (temp["selectedTripId"]) {
+    selectedTripId.value = temp.selectedTripId;
+    // console.log(
+    //   "selectedTripId exists in cookies, selectedTripId.value=",
+    //   selectedTripId.value
+    // );
+    if (trips.value) {
+      selectedTrip.value = trips.value.find(
+        (item: Trip) => item.id === selectedTripId.value
+      );
+    }
+    if (selectedTrip.value) {
+      ltripname.value = selectedTrip.value.name;
+      fetchFilteredExpenses();
+    }
+    // console.log("selectedTrip", selectedTrip.value, "selectedTripId: ",selectedTripId.value)
+  } else {
+    console.log(
+      "selectedTripId does not exist in cookies, selectedTripId.value=",
+      selectedTripId.value
+    );
+  }
 });
 
+const fetchFilteredExpenses = async () => {
+  try {
+    filteredexpenses.value = await $ifetch.post("/api/tripexpenses", {
+      // data: { id: "9bb38019-873f-4bf4-8a35-ac4dffb49bf7" },
+      data: { id: selectedTripId.value },
+      headers: { "Content-Type": "application/json" },
+    });
+  } catch (error) {
+    console.error("Error fetching filtered Expenses", error);
+  }
+};
+
+const goToTrips = () => {
+  router.push("/trips");
+};
 </script>
 
 <style scoped>
@@ -143,12 +207,18 @@ ion-col {
   align-items: center;
   justify-content: center;
   text-align: center;
-  
+
   border-bottom: solid 1px rgba(228, 228, 228, 0.491);
   /*
   nobackground-color: #ffffff;
   border-bottom: solid 1px;
   nocolor: #000000; */
+}
+
+ion-title {
+  padding-left: 50px;
+  justify-content: left;
+  text-align: left;
 }
 
 .date {

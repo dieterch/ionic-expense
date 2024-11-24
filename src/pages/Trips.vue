@@ -22,7 +22,7 @@
       </ion-header>
       <!--ion-item v-for="expense in expenses"-->
       <ion-grid>
-        <ion-row v-for="trip in trips">
+        <ion-row v-for="trip in trips" @click = "clickrow(trip)">
           <!--ion-col size="1.2">
             <h1><i :class="mdiIconText(expense.category.icon)"></i></h1>
           </ion-col-->
@@ -111,19 +111,24 @@ import {
   create
 } from "ionicons/icons";
 import { useIFetch } from "@/composables/UseIonosfetch";
-const { get, post, put, del, request } = useIFetch();
-import { ref, computed, onMounted } from "vue";
+const $ifetch = useIFetch();
 
-interface User {
+import { ref, computed, onMounted } from "vue";
+import { CapacitorCookies } from "@capacitor/core";
+import { useRouter } from 'vue-router';
+const router = useRouter();
+
+interface TripUser {
   user: {
     name: string;
   };
 }
 
 interface Trip {
+  id: string;
   startDate: Date;
   name: string;
-  users: User[];
+  users: TripUser[];
   expenses: [];
 }
 
@@ -135,9 +140,19 @@ const mdiIconText = (name: string) => {
 
 // Fetch Data on Mount
 onMounted(async () => {
-  trips.value = await get("/api/trips");
-  users.value = await get("/api/users");
+  trips.value = await $ifetch.get("/api/trips");
+  users.value = await $ifetch.get("/api/users");
 });
+
+const clickrow = (trip:Trip) => {
+  // console.log(trip.id);
+  CapacitorCookies.setCookie({
+    key: "selectedTripId",
+    value: trip.id,
+  });
+
+  router.push('/expenses')
+};
 </script>
 
 <style scoped>
