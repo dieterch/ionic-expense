@@ -63,6 +63,7 @@
                     :key="category.id"
                     :value="category.id"
                   >
+                    <h1><i :class="mdiIconText(category.icon)"></i></h1>
                     {{ category.name }}
                   </ion-select-option>
                 </ion-select>
@@ -183,6 +184,8 @@ const currencies = [
   { name: "EUR", symbol: "€", factor: 1.0 },
 ];
 
+const mdiIconText = (name: string) => `mdi ${name}`;
+
 // Props and Emits
 const props = defineProps<{
   dialog: boolean;
@@ -298,3 +301,8 @@ const closeDialog = () => {
   emit("dialog", false);
 };
 </script>
+
+
+<style scoped>
+
+</style>
