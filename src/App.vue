@@ -22,7 +22,7 @@
                 :class="{ selected: selectedIndex === i }"
               >
                 <ion-icon
-                  aria-hidden="true"
+                  no-aria-hidden="true"
                   slot="start"
                   :ios="p.iosIcon"
                   :md="p.mdIcon"

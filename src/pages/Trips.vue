@@ -111,7 +111,7 @@ import {
   create
 } from "ionicons/icons";
 import { useIFetch } from "@/composables/UseIonosfetch";
-const $ifetch = useIFetch();
+const ifetch = useIFetch();
 
 import { ref, computed, onMounted } from "vue";
 import { CapacitorCookies } from "@capacitor/core";
@@ -140,8 +140,8 @@ const mdiIconText = (name: string) => {
 
 // Fetch Data on Mount
 onMounted(async () => {
-  trips.value = await $ifetch.get("/api/trips");
-  users.value = await $ifetch.get("/api/users");
+  trips.value = await ifetch.get("/api/trips");
+  users.value = await ifetch.get("/api/users");
 });
 
 const clickrow = (trip:Trip) => {

@@ -2,6 +2,17 @@
   <ion-page>
     <ion-content :fullscreen="true">
       <ion-header collapse="fade">
+        <!-- Expense Dialog -->
+        <d-ion-expensedialog
+          :dialog="isExpenseDialogOpen"
+          :key="isExpenseDialogOpen as unknown as PropertyKey"
+          :mode="emode"
+          :item="eitem"
+          :selectedTrip="selectedTrip"
+          @refresh="fetchFilteredExpenses"
+          @dialog="(e: boolean) => (isExpenseDialogOpen = e)"
+        />
+        <!-- Toolbar -->
         <ion-toolbar>
           <ion-buttons slot="start">
             <ion-menu-button size="small"></ion-menu-button>
@@ -10,7 +21,7 @@
             <span @click="goToTrips">{{ ltripname }}</span>
           </ion-title>
           <ion-buttons slot="end">
-            <ion-button shape="round" size="small">
+            <ion-button shape="round" size="small" @click="clickplus">
               <ion-icon slot="icon-only" :icon="addCircle"></ion-icon>
             </ion-button>
             <ion-button shape="round" size="small">
@@ -25,13 +36,14 @@
           </ion-buttons>
         </ion-toolbar>
       </ion-header>
-      <!--ion-item v-for="expense in expenses"-->
+
+      <!-- Expense List -->
       <ion-grid>
-        <ion-row v-for="expense in filteredexpenses">
-          <ion-col size="1.2">
+        <ion-row v-for="expense in filteredexpenses" :key="expense.id">
+          <ion-col size="1.2" class="icon">
             <h1><i :class="mdiIconText(expense.category.icon)"></i></h1>
           </ion-col>
-          <ion-col size="1.6" class="date">
+          <ion-col size="1.9" class="date">
             <ion-label>
               <h3>
                 {{
@@ -44,23 +56,29 @@
               </h3>
             </ion-label>
           </ion-col>
-          <ion-col class="left">
+          <ion-col class="content">
             <ion-label>
               <h2>{{ expense.description }}</h2>
               <p>Payed by {{ expense.user.name }}</p>
             </ion-label>
           </ion-col>
-          <ion-col size="2"> {{ expense.amount }} € </ion-col>
-          <ion-col size="1.1">
+          <ion-col size="2" class="amount"> {{ expense.amount }} € </ion-col>
+          <ion-col size="2.2" class="righticon">
             <ion-buttons>
-              <ion-button color="dark" size="small">
+              <ion-button
+                color="dark"
+                size="small"
+                @click="deleteExpense(expense)"
+              >
                 <ion-icon slot="icon-only" :icon="trashBin"></ion-icon>
+              </ion-button>
+              <ion-button color="dark" size="small">
+                <ion-icon slot="icon-only" :icon="create"></ion-icon>
               </ion-button>
             </ion-buttons>
           </ion-col>
         </ion-row>
       </ion-grid>
-      <!--/ion-item-->
     </ion-content>
   </ion-page>
 </template>
@@ -79,120 +97,104 @@ import {
   IonPage,
   IonTitle,
   IonToolbar,
-  IonItem,
-  IonThumbnail,
-  IonLabel,
-  IonList,
-  IonCard,
-  IonCardContent,
-  IonCardHeader,
-  IonCardSubtitle,
-  IonCardTitle,
+  IonLabel
 } from "@ionic/vue";
 import {
-  addCircleOutline,
   addCircle,
-  bugOutline,
   bug,
-  documentOutline,
   document,
-  reloadOutline,
   reload,
-  trashBinOutline,
   trashBin,
-  createOutline,
   create,
 } from "ionicons/icons";
-import { useIFetch } from "@/composables/UseIonosfetch";
-const $ifetch = useIFetch();
 
-import { ref, computed, onMounted } from "vue";
-import { CapacitorCookies } from "@capacitor/core";
+import { ref, onMounted } from "vue";
+import { onIonViewWillEnter } from "@ionic/vue";
 import { useRouter } from "vue-router";
+import { CapacitorCookies } from "@capacitor/core";
+import type { Trip, SelectedTrip, Expense } from "@/types";
+import { useIFetch } from "@/composables/UseIonosfetch";
+import dIonExpensedialog from "@/components/d-ion-expensedialog.vue";
+// import dExpensedialog from "../components/d-expensedialog.vue";
+
+// Fetch utility composable
+const ifetch = useIFetch();
+
+// Component States
+const isExpenseDialogOpen = ref<boolean>(false);
+const emode = ref<"add" | "update">("add");
+const eitem = ref<Partial<Expense>>({});
+const trips = ref<Trip[]>([]);
+const ltripname = ref("");
+const selectedTrip = ref<Trip | null>(null);
+const selectedTripId = ref<string>("");
+const filteredexpenses = ref<Expense[]>([]);
+
+// Navigation
 const router = useRouter();
 
-interface TripUser {
-  user: {
-    name: string;
-  };
-}
+const mdiIconText = (name: string) => `mdi ${name}`;
 
-interface Trip {
-  id: string;
-  startDate: Date;
-  name: string;
-  users: TripUser[];
-  expenses: [];
-}
 
-interface Expense {
-  date: Date;
-  description: string;
-  amount: Number;
-  user: {
-    name: string;
-  };
-  trip: {
-    name: string;
-  };
-  category: {
-    icon: string;
-  };
-}
-
-const trips = ref<Trip[]>();
-const ltripname = ref("");
-const selectedTrip = ref<Trip>();
-const selectedTripId = ref("");
-const filteredexpenses = ref<Expense[]>();
-// const debug = ref(false);
-//const expenses = ref<Expense[]>();
-const mdiIconText = (name: string) => {
-  return "mdi " + name;
+// Switch trip based on cookie
+const switchtrip = async () => {
+  try {
+    trips.value = await ifetch.get<Trip[]>("/api/trips");
+    const cookies = await CapacitorCookies.getCookies();
+    if (cookies["selectedTripId"]) {
+      selectedTripId.value = cookies.selectedTripId;
+      selectedTrip.value = trips.value.find((trip) => trip.id === selectedTripId.value) || null;
+      
+      if (selectedTrip.value) {
+        ltripname.value = selectedTrip.value.name;
+        await fetchFilteredExpenses();
+      }
+    }
+  } catch (error) {
+    console.error("Error fetching trips:", error);
+  }
 };
 
-// Fetch Data on Mount
-onMounted(async () => {
-  trips.value = await $ifetch.get("/api/trips");
-  const temp = await CapacitorCookies.getCookies();
-  if (temp["selectedTripId"]) {
-    selectedTripId.value = temp.selectedTripId;
-    // console.log(
-    //   "selectedTripId exists in cookies, selectedTripId.value=",
-    //   selectedTripId.value
-    // );
-    if (trips.value) {
-      selectedTrip.value = trips.value.find(
-        (item: Trip) => item.id === selectedTripId.value
-      );
-    }
-    if (selectedTrip.value) {
-      ltripname.value = selectedTrip.value.name;
-      fetchFilteredExpenses();
-    }
-    // console.log("selectedTrip", selectedTrip.value, "selectedTripId: ",selectedTripId.value)
-  } else {
-    console.log(
-      "selectedTripId does not exist in cookies, selectedTripId.value=",
-      selectedTripId.value
-    );
-  }
-});
+// Fetch initial data on mount
+onMounted(switchtrip);
+onIonViewWillEnter(switchtrip);
 
+// Fetch filtered expenses
 const fetchFilteredExpenses = async () => {
   try {
-    filteredexpenses.value = await $ifetch.post("/api/tripexpenses", {
-      // data: { id: "9bb38019-873f-4bf4-8a35-ac4dffb49bf7" },
+    const response = await ifetch.post<Expense[]>("/api/tripexpenses", {
       data: { id: selectedTripId.value },
       headers: { "Content-Type": "application/json" },
     });
+    filteredexpenses.value = response;
   } catch (error) {
-    console.error("Error fetching filtered Expenses", error);
+    console.error("Error fetching filtered expenses:", error);
   }
 };
 
+// Handle adding a new expense
+const clickplus = () => {
+  emode.value = "add";
+  eitem.value = {};
+  isExpenseDialogOpen.value = true;
+};
+
+// Navigate to trips page
 const goToTrips = () => {
   router.push("/trips");
+};
+
+// Delete an expense
+const deleteExpense = async (item: Expense) => {
+  try {
+    await ifetch.del("/api/expenses", {
+      data: { id: item.id },
+      headers: { "Content-Type": "application/json" },
+    });
+    await fetchFilteredExpenses();
+  } catch (error) {
+    console.error("Error deleting expense:", error);
+  }
 };
 </script>
 
@@ -221,15 +223,32 @@ ion-title {
   text-align: left;
 }
 
-.date {
-  padding-top: 16px;
+.icon {
+  padding-top: 0px;
   align-items: start;
 }
 
-.left {
+.date {
+  padding-top: 20px;
+  align-items: start;
+}
+
+.content {
+  padding-top: 20px;
   padding-left: 10px;
+  align-items: start;
   justify-content: left;
   text-align: left;
+}
+
+.amount {
+  padding-top: 20px;
+  align-items: start;
+}
+
+.righticon {
+  padding-top: 10px;
+  align-items: start;
 }
 
 #container {

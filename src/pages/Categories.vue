@@ -95,7 +95,7 @@ import {
   create
 } from "ionicons/icons";
 import { useIFetch } from "@/composables/UseIonosfetch";
-const $ifetch = useIFetch();
+const ifetch = useIFetch();
 
 import { ref, computed, onMounted } from "vue";
 
@@ -113,7 +113,7 @@ const mdiIconText = (name: string) => {
 
 // Fetch Data on Mount
 onMounted(async () => {
-  categories.value = await $ifetch.get("/api/categories");
+  categories.value = await ifetch.get("/api/categories");
 });
 </script>
 
